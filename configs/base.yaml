@@ -1,0 +1,62 @@
+# ./med_risk_pred/configs/base.yaml
+paths:
+  data_dir: ./med_risk_pred/data/processed
+  model_dir: ./med_risk_pred/models/pretrained
+  output_dir: ./med_risk_pred/results
+
+data:
+  input_window_minutes: 360  # 6-hour window
+  prediction_horizon: 720    # 12-hour prediction
+  features:
+    temporal:
+      - heart_rate
+      - blood_pressure
+      - spo2
+      - urine_output
+    static:
+      - age
+      - chronic_kidney_disease
+      - congestive_heart_failure
+  processors:
+    mimic: ./med_risk_pred/data/processors/mimic_loader.py
+    eicu: ./med_risk_pred/data/processors/eicu_processor.py
+   
+model:
+  architecture: cnn_bilstm_attention
+  params:
+    temporal_encoder:
+      cnn_filters: [64, 128]
+      lstm_units: 256
+      dropout: 0.2
+    static_encoder:
+      dense_layers: [128, 64]
+    attention_heads: 4
+    output_units: 
+      aki: 1
+      respiratory: 1
+      cardiac: 1
+
+bed_occupancy:
+  prediction_window: 6    # Hours ahead to predict
+  rolling_features:
+    occupancy: [6, 12]    # Rolling window sizes in hours
+    admissions: [12, 24]
+  model_selection: lstm    # Default model type
+
+
+training:
+  epochs: 100
+  batch_size: 32
+  optimizer:
+    name: AdamW
+    lr: 0.001
+    weight_decay: 0.01
+  loss:
+    aki: focal_tversky
+    respiratory: binary_crossentropy
+    cardiac: ranking_loss
+
+deployment:
+  api_host: 0.0.0.0
+  api_port: 8000
+  model_weights_path: ./med_risk_pred/models/production/multi_task_v1.pt
